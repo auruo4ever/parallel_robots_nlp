@@ -1,0 +1,96 @@
+{
+    "nodes": [
+        {
+            "id": "node_0",
+            "label": "start",
+            "type": "place"
+        },
+        {
+            "id": "node_1",
+            "label": "task_start",
+            "type": "transition"
+        },
+        {
+            "id": "node_4",
+            "label": "A-1",
+            "type": "place"
+        },
+        {
+            "id": "node_7",
+            "label": "B-1",
+            "type": "place"
+        },
+        {
+            "id": "node_2",
+            "label": "end",
+            "type": "place"
+        },
+        {
+            "id": "node_3",
+            "label": "task_end",
+            "type": "transition"
+        },
+        {
+            "id": "node_5",
+            "label": "does_dishes_A_0",
+            "type": "transition"
+        },
+        {
+            "id": "node_6",
+            "label": "A0",
+            "type": "place"
+        },
+        {
+            "id": "node_8",
+            "label": "takes_pot_B_0",
+            "type": "transition"
+        },
+        {
+            "id": "node_9",
+            "label": "B0",
+            "type": "place"
+        }
+    ],
+    "edges": [
+        {
+            "source": "node_0",
+            "target": "node_1"
+        },
+        {
+            "source": "node_1",
+            "target": "node_4"
+        },
+        {
+            "source": "node_1",
+            "target": "node_7"
+        },
+        {
+            "source": "node_3",
+            "target": "node_2"
+        },
+        {
+            "source": "node_4",
+            "target": "node_5"
+        },
+        {
+            "source": "node_5",
+            "target": "node_6"
+        },
+        {
+            "source": "node_6",
+            "target": "node_3"
+        },
+        {
+            "source": "node_7",
+            "target": "node_8"
+        },
+        {
+            "source": "node_8",
+            "target": "node_9"
+        },
+        {
+            "source": "node_9",
+            "target": "node_3"
+        }
+    ]
+}
