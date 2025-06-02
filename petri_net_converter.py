@@ -3,6 +3,7 @@ snakes.plugins.load("gv", "snakes.nets", "nets")
 from nets import *
 import re
 from collections import defaultdict
+from save_as_json import dot_to_json 
 
 
 def transition_exists(net, name):
@@ -140,6 +141,9 @@ def draw_petri_net(actors_actions):
 
     n.draw("petri_net.png")
     n.draw("petri_net.dot")
+    with open("petri_net.dot", "r") as f:
+        dot_str = f.read()
+    dot_to_json(dot_str)
     print(f"✅ Petri net saved")
 
 def save_dependency_tree_as_svg(doc, filename="dependency_tree.svg"):
