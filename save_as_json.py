@@ -15,7 +15,6 @@ def dot_to_json(dot_data, output_file="petri_net.json"):
     def clean_label(label):
         if label:
             label = label.strip('"')
-            # Replace literal '\n' with actual splitting
             if '\\n' in label:
                 return label.split('\\n')[0]
             elif '\n' in label:

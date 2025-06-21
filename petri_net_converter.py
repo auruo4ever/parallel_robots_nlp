@@ -26,7 +26,7 @@ def extract_brenching(text):
     words = re.findall(pattern, text)
     return words[0].split('_') if words else []
 
-def extract_ornoun(text):
+def extract_oractor(text):
     pattern = r"^(ORNOUN)_([^_]+(?:_[^_]+)*)_([^_]+)$"  
     match = re.match(pattern, text)
     
@@ -36,120 +36,150 @@ def extract_ornoun(text):
         return final_part, middle_part
     return None, None  
 
-
-def draw_petri_net(actors_actions):
+def initialize_petri_net():
     n = PetriNet('petri_net')
     n.add_place(Place('start'))
     n.add_transition(Transition('task_start'))
     n.add_input('start', 'task_start', Value("1"))
-    
+
     n.add_place(Place('end'))
     n.add_transition(Transition('task_end'))
     n.add_output('end', "task_end", Value("1"))
 
+    return n
 
-    for actor in actors_actions.keys():
-        #start place and transition
-        n.add_place(Place(actor+str(-1), "Robot is on"))
-        previous_place = actor+str(-1)
-        n.add_output(actor+str(-1), 'task_start', Value("1"))
-        
-        i = 0
-        while i < len(actors_actions[actor]):
-            verb = actors_actions[actor][i]
-            
-            #for sequential
-            if not verb.startswith(("BARRIER_", "SINC_", "OR")):
-                n.add_transition(Transition(verb+'_'+actor+'_'+str(i)))
-            
-                n.add_input(previous_place, verb+'_'+actor+'_'+str(i), Value("1"))
-                n.add_place(Place(actor+str(i)))
-                n.add_output(actor+str(i), verb+'_'+actor+'_'+str(i), Value("1"))
-                
-                previous_place = actor+str(i)
-                    
-            else:
-            #for barriers
-                if verb.startswith(("BARRIER_")):
-                    if not transition_exists(n, verb):
-                        n.add_transition(Transition(verb))
-                    n.add_input(previous_place, verb, Value("1"))
-                    n.add_place(Place(actor+str(i)))
-                    n.add_output(actor+str(i), verb, Value("1"))
-                    previous_place = actor+str(i)                    
-        
+def process_actor_trace(actor, actions, net):
+    net.add_place(Place(actor + str(-1), "Robot is on"))
+    net.add_output(actor + str(-1), 'task_start', Value("1"))
+    previous_place = actor + str(-1)
 
-                if verb.startswith(("SINC_")):    
-                    verb = actors_actions[actor][i]
-                    if not transition_exists(n, verb):
-                        n.add_transition(Transition(verb))
-                    n.add_input(previous_place, verb, Value("1"))
-                    n.add_place(Place(actor+str(i)))
-                    n.add_output(actor+str(i), verb, Value("1"))
-                    previous_place = actor+str(i)           
-                    
-                    
-                #for OR between verbs
-                if verb.startswith(("ORVERB_")):
-                    #ORVERB_take_wash_0
-                    brenches = extract_brenching(verb)
-                    print(brenches)
+    i = 0
+    while i < len(actions):
+        action = actions[i]
 
-                    n.add_place(Place(actor+str(i)))
-                    for b in brenches:
-                        transition_name = b+'_'+actor+'_'+str(i)
-                        n.add_transition(Transition(transition_name))
-                        n.add_input(previous_place, transition_name, Value("1"))
-                        n.add_output(actor+str(i), transition_name, Value("1"))
-                    
-                    previous_place = actor+str(i)  
-                
-                #for OR between nouns
-                if verb.startswith(("ORNOUN_")):    
-                    print("hehehe")
-                    transition_name, actors_name = extract_ornoun(verb)
-                    print(transition_name)
-                    if not transition_exists(n, transition_name):
-                        n.add_transition(Transition(transition_name))
-                        n.add_place(Place("PLACE_"+transition_name))
-                        n.add_output("PLACE_"+transition_name, transition_name, Value("1"))
-                    n.add_input(previous_place, transition_name, Value("1"))
-                    previous_place = "PLACE_"+transition_name
-                    i+=1
-                    verb = actors_actions[actor][i]
-                    transition_name_2 = verb+'_'+actors_name+'_'+str(i)
-                    if not transition_exists(n, transition_name_2):
-                        n.add_transition(Transition(transition_name_2))
-                        n.add_input(previous_place, transition_name_2, Value("1"))
-                    
-                        place_name="PLACE_"+transition_name+'2'
-                        if not place_exists(n, place_name):
-                            n.add_place(Place(place_name))
-                            n.add_transition(Transition(transition_name+'2'))
-                            n.add_input(place_name, transition_name+'2', Value("1"))
-                        n.add_output(place_name, transition_name_2, Value("1"))
-                    n.add_place(Place(actor+str(i)))
-                    n.add_output(actor+str(i), transition_name+'2', Value("1"))
-                    previous_place = actor+str(i)
-                    
-                                       
-                    
-            if i == len(actors_actions[actor]) - 1:
-                n.add_input(previous_place, 'task_end', Value("ε"))     
-            
-            i += 1           
+        if not action.startswith(("BARRIER_", "SINC_", "OR")):
+            previous_place = handle_regular_action(net, actor, i, action, previous_place)
 
-    n.draw("petri_net.png")
-    n.draw("petri_net.dot")
-    with open("petri_net.dot", "r") as f:
+        elif action.startswith("BARRIER_"):
+            previous_place = handle_barrier(net, actor, i, action, previous_place)
+
+        elif action.startswith("SINC_"):
+            previous_place = handle_sync(net, actor, i, action, previous_place)
+
+        elif action.startswith("ORVERB_"):
+            previous_place = handle_orverb(net, actor, i, action, previous_place)
+
+        elif action.startswith("ORNOUN_"):
+            i, previous_place = handle_ornoun(net, actor, i, actions, previous_place)
+
+        if i == len(actions) - 1:
+            net.add_input(previous_place, 'task_end', Value("ε"))
+
+        i += 1
+
+
+def handle_regular_action(net, actor, i, action, previous_place):
+    t_name = f"{action}_{actor}_{i}"
+    net.add_transition(Transition(t_name))
+    net.add_input(previous_place, t_name, Value("1"))
+    place_name = f"{actor}{i}"
+    net.add_place(Place(place_name))
+    net.add_output(place_name, t_name, Value("1"))
+    return place_name
+
+def handle_barrier(net, actor, i, action, previous_place):
+    if not transition_exists(net, action):
+        net.add_transition(Transition(action))
+    net.add_input(previous_place, action, Value("1"))
+    place_name = f"{actor}{i}"
+    net.add_place(Place(place_name))
+    net.add_output(place_name, action, Value("1"))
+    return place_name
+
+def handle_sync(net, actor, i, action, previous_place):
+    if not transition_exists(net, action):
+        net.add_transition(Transition(action))
+    net.add_input(previous_place, action, Value("1"))
+    place_name = f"{actor}{i}"
+    net.add_place(Place(place_name))
+    net.add_output(place_name, action, Value("1"))
+    return place_name
+
+def handle_orverb(net, actor, i, action, previous_place):
+    branches = extract_brenching(action)
+    place_name = f"{actor}{i}"
+    net.add_place(Place(place_name))
+    for b in branches:
+        t_name = f"{b}_{actor}_{i}"
+        net.add_transition(Transition(t_name))
+        net.add_input(previous_place, t_name, Value("1"))
+        net.add_output(place_name, t_name, Value("1"))
+    return place_name
+
+def handle_ornoun(net, actor, i, actions, previous_place):
+    transition_name, actors_name = extract_oractor(actions[i])
+    if not transition_exists(net, transition_name):
+        net.add_transition(Transition(transition_name))
+        net.add_place(Place(f"PLACE_{transition_name}"))
+        net.add_output(f"PLACE_{transition_name}", transition_name, Value("1"))
+    net.add_input(previous_place, transition_name, Value("1"))
+    previous_place = f"PLACE_{transition_name}"
+
+    i += 1
+    next_action = actions[i]
+    t2_name = f"{next_action}_{actors_name}_{i}"
+    if not transition_exists(net, t2_name):
+        net.add_transition(Transition(t2_name))
+        net.add_input(previous_place, t2_name, Value("1"))
+
+        place_name = f"PLACE_{transition_name}2"
+        if not place_exists(net, place_name):
+            net.add_place(Place(place_name))
+            net.add_transition(Transition(f"{transition_name}2"))
+            net.add_input(place_name, f"{transition_name}2", Value("1"))
+        net.add_output(place_name, t2_name, Value("1"))
+
+    actor_place = f"{actor}{i}"
+    net.add_place(Place(actor_place))
+    net.add_output(actor_place, f"{transition_name}2", Value("1"))
+    return i, actor_place
+
+
+def save_petri_net_png(net, filename="petri_net.png"):
+    """
+    Saves the Petri net visualization as a PNG image.
+    """
+    net.draw(filename)
+    print(f"Petri net image saved as {filename}")
+
+def save_petri_net_dot(net, filename="petri_net.dot"):
+    """
+    Saves the Petri net structure in DOT format.
+    """
+    net.draw(filename)
+    print(f"Petri net DOT file saved as {filename}")
+
+def convert_dot_to_json(dot_filename="petri_net.dot"):
+    """
+    Converts the DOT file to JSON format using `dot_to_json`.
+    """
+    with open(dot_filename, "r") as f:
         dot_str = f.read()
     dot_to_json(dot_str)
-    print(f"✅ Petri net saved")
+    print("Petri net DOT file saved as JSON")
 
-def save_dependency_tree_as_svg(doc, filename="dependency_tree.svg"):
-    svg = displacy.render(doc, style="dep", jupyter=False)
-    if not svg:
-        raise ValueError("Error: displacy.render() returned None.")
-    with open(filename, "w", encoding="utf-8") as f:
-        f.write(svg)
-    print(f"✅ Dependency tree saved as {filename}")
+def finalize_and_save_petri_net(net):
+    save_petri_net_png(net)
+    save_petri_net_dot(net)
+    convert_dot_to_json()
+    print("✅ Petri net saved.")
+
+
+
+def draw_petri_net(actors_actions):
+    n = initialize_petri_net()
+    
+    for actor in actors_actions.keys():
+        process_actor_trace(actor, actors_actions[actor], n)
+
+    finalize_and_save_petri_net(n)

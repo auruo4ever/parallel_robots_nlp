@@ -1,18 +1,10 @@
-
 import snakes.plugins
 snakes.plugins.load("gv", "snakes.nets", "nets")
 from nets import *
-import re
-from collections import defaultdict
-import time
 import spacy.displacy as displacy
 from tree_analysis import get_parallel_tasks 
 from petri_net_converter import draw_petri_net 
-from petri_net_converter import save_dependency_tree_as_svg
 import spacy
-import snakes.plugins
-snakes.plugins.load("gv", "snakes.nets", "nets")
-from nets import *
 import tkinter as tk
 
 
